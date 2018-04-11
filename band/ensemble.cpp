@@ -1,4 +1,4 @@
-//
+// This is test 
 //  ensemble.cpp
 //  band
 //
@@ -15,71 +15,69 @@
 #include <vector>
 #include <math.h>
 #include <opencv/cv.hpp>
+#include <stdlib.h>
+#include <Windows.h>
 
 using namespace std;
 using namespace cv;
 
 int make_output() {
-    const string source = "~/band/sample_video/sample.avi";
-    
-    vector<string> videoPath;
-    videoPath.push_back(source);
-    videoPath.push_back(source);
-    videoPath.push_back(source);
-    videoPath.push_back(source);
-    videoPath.push_back(source);
-    videoPath.push_back(source);
-    
-    int H = (int)(sqrt(videoPath.size()));
-    int W = ceil((videoPath.size()) / (double)H);
-    
-    vector<VideoCapture> inputVideo;
-    
-    for (int i = 0; i < videoPath.size(); i++) {
-        inputVideo.push_back(VideoCapture(videoPath[i]));
-        
-        if (!inputVideo[i].isOpened()) {
-            cout << "fail to read the video" << endl;
-            return EXIT_FAILURE;
-        }
-    }
-    
-    // 모든 비디오의 width와 height가 같다고 가정
-    double fps = inputVideo[0].get(CV_CAP_PROP_FPS);
-    int width = (int)inputVideo[0].get(CV_CAP_PROP_FRAME_WIDTH);
-    int height = (int)inputVideo[0].get(CV_CAP_PROP_FRAME_HEIGHT);
-    int W_size = width * W;
-    int H_size = height * H;
-    int loop = 1;
-    VideoWriter outputVideo("result.avi", CV_FOURCC('D', 'I', 'V', 'X'), fps, Size(W_size, H_size));
-    
-    while (loop) {
-        Mat image = Mat(Size(W_size, H_size), CV_8UC3);
-        
-        int i = 0;
-        for (int c = 0; c < H; ++c) {
-            for (int r = 0; r < W; ++r) {
-                Mat frame;
-                if (i > videoPath.size() - 1)
-                    continue;
-                
-                inputVideo[i] >> frame;
-                i++;
-                
-                if (frame.empty()) {
-                    loop = 0;
-                    break;
-                }
-                frame.copyTo(image(Rect((r*width), (c*height), width, height)));
-            }
-        }
-        if (!image.empty()) {
-            outputVideo.write(image);
-            imshow("image", image);
-            waitKey(1);
-        }
-    }
-    
-    outputVideo.release();
-    return 0;
+	const string source1 = "sample1.avi";
+	const string source2 = "sample2.avi";
+
+	vector<string> videoPath;
+	videoPath.push_back(source1);
+	videoPath.push_back(source2);
+
+	vector<VideoCapture> inputVideo;
+
+	for (int i = 0; i < videoPath.size(); i++) {
+		inputVideo.push_back(VideoCapture(videoPath[i]));
+
+		if (!inputVideo[i].isOpened()) {
+			cout << "fail to read the video" << endl;
+			return EXIT_FAILURE;
+		}
+	}
+
+	double fps = inputVideo[0].get(CV_CAP_PROP_FPS);
+	int width1 = (int)inputVideo[0].get(CV_CAP_PROP_FRAME_WIDTH);
+	int height1 = (int)inputVideo[0].get(CV_CAP_PROP_FRAME_HEIGHT);
+	int width2 = (int)inputVideo[1].get(CV_CAP_PROP_FRAME_WIDTH);
+	int height2 = (int)inputVideo[1].get(CV_CAP_PROP_FRAME_HEIGHT);
+	int width = 0;
+	if (width1 > width2) width = width1; else width = width2;
+	int W_size = width;
+	int H_size = height1 + height2;
+	int loop = 1;
+	VideoWriter outputVideo("result.avi", CV_FOURCC('D', 'I', 'V', 'X'), fps, Size(W_size, H_size));
+
+	while (loop) {
+		Mat image = Mat(Size(W_size, H_size), CV_8UC3);
+
+		int i = 0;
+		Mat frame;
+		inputVideo[i] >> frame;
+		i++;
+		if (frame.empty()) {
+			loop = 0;
+			break;
+		}
+		frame.copyTo(image(Rect(0, 0, width1, height1)));
+		inputVideo[i] >> frame;
+		frame.copyTo(image(Rect(0, height1, width2, height2)));
+
+		if (!image.empty()) {
+			outputVideo.write(image);
+			//imshow("image", image);
+			//waitKey(1);
+		}
+	}
+
+	outputVideo.release();
+
+	// Put the absolute path for the script file
+	system("mergemp3.bat");
+
+	return 0;
 }
