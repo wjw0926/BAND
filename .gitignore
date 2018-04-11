@@ -34,3 +34,13 @@
 # IDE files
 *.xcodeproj/
 *.vcxproj
+
+# Executable C files
+band/server
+client/client
+
+# Sample videos
+sample_video/
+
+# Script files
+*/run.sh
