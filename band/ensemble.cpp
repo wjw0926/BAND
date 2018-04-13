@@ -50,23 +50,20 @@ int make_output() {
 	int W_size = width;
 	int H_size = height1 + height2;
 	int loop = 1;
-	VideoWriter outputVideo("result.avi", CV_FOURCC('D', 'I', 'V', 'X'), fps, Size(W_size, H_size));
-
+	VideoWriter outputVideo("result.avi", CV_FOURCC('D', 'I', 'V', 'X'), fps / 2, Size(W_size, H_size));
+	int set1, set2;
+	set1 = set2 = 1;
 	while (loop) {
 		Mat image = Mat(Size(W_size, H_size), CV_8UC3);
-
-		int i = 0;
 		Mat frame;
-		inputVideo[i] >> frame;
-		i++;
-		if (frame.empty()) {
-			loop = 0;
-			break;
-		}
-		frame.copyTo(image(Rect(0, 0, width1, height1)));
-		inputVideo[i] >> frame;
-		frame.copyTo(image(Rect(0, height1, width2, height2)));
 
+		inputVideo[0] >> frame;
+		if (!frame.empty()) frame.copyTo(image(Rect(0, 0, width1, height1)));
+		else set1 = 0;
+		inputVideo[1] >> frame;
+		if (!frame.empty()) frame.copyTo(image(Rect(0, height1, width2, height2)));
+		else set2 = 0;
+		if (set1 == 0 && set2 == 0) { loop = 0; break; }
 		if (!image.empty()) {
 			outputVideo.write(image);
 			//imshow("image", image);
