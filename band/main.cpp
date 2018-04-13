@@ -19,17 +19,21 @@
 #include <dirent.h>
 #include <string.h>
 
+#include "ensemble.hpp"
+
 #define PORTNUM 3800
 #define MAXLINE 1024
 
 #define Q_LIST      1
 #define Q_UPLOAD    2
 #define Q_DOWNLOAD  3
+#define Q_MERGE     4
 
 int processRequest(int sockfd);
 int serv_file_list(int sockfd);
 int serv_file_upload(int sockfd, char *filename);
 int serv_file_download(int sockfd, char *filename);
+int serv_file_merge(int sockfd, char *filename);
 
 struct Cquery
 {
@@ -120,6 +124,9 @@ int processRequest(int sockfd) {
                break;
            case Q_DOWNLOAD:
                serv_file_download(sockfd, query.f_name);
+               break;
+           case Q_MERGE:
+               serv_file_merge(sockfd, query.f_name);
                break;
            default:
                ret = -1;
@@ -256,5 +263,74 @@ int serv_file_download(int sockfd, char *filename) {
     printf("Sending file %s is done!\n", ret);
     close(sockfd);
  
+    return 1;
+}
+
+int serv_file_merge(int sockfd, char *filename) {
+    size_t sendn;
+
+    //Tokenizing the filename
+    char *token;
+    char *rest = filename;
+    token = strtok_r(rest, "-", &rest);
+
+    //Merge two videos
+    std::string first(token);
+    std::string second(rest);
+    printf("Merging two files %s, %s...\n", token, rest);
+    mergeVideo(std::string(token), std::string(rest));
+
+    //Open a merged file to read
+    char path[64] = {0x00,};
+    sprintf(path, "video/final.avi");
+    FILE *f = fopen(path, "rb");
+    if(f == NULL)
+    {
+        printf("ERROR: File final.avi not found.\n");
+        fclose(f);
+        close(sockfd);
+        return -1;
+    }
+
+    //Send a merged file content to a client
+    fseek(f, 0, SEEK_END);
+    long filesize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    printf("Merged file size is %ld\n", filesize);
+
+    char *buffer = (char *)malloc(filesize + 1);
+    if (!buffer)
+    {
+        printf("ERROR: Failed to allocate memory\n");
+        fclose(f);
+        free(buffer);
+        close(sockfd);
+
+        return 0;
+    }
+
+    memset(buffer, 0, filesize+1);
+    if(fread(buffer, filesize, 1, f) > 0)
+    {
+        int offset = 0;
+        long bytestosend = filesize;
+        while((sendn = send(sockfd, buffer+offset, MAXLINE, 0)) > 0 && bytestosend > 0)
+        {
+            offset += sendn;
+            bytestosend -= sendn;
+        }
+    } else {
+        fclose(f);
+        free(buffer);
+        printf("ERROR: Failed to read file final.avi\n");
+        close(sockfd);
+        return 0;
+    }
+
+    fclose(f);
+    free(buffer);
+    printf("Sending merged file final.avi is done!\n");
+    close(sockfd);
+
     return 1;
 }

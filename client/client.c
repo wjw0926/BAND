@@ -23,14 +23,16 @@
 #define Q_LIST      1
 #define Q_UPLOAD    2
 #define Q_DOWNLOAD  3
+#define Q_MERGE     4
 
 int get_list(int sockfd);
 int upload(int sockfd, char *file);
 int download(int sockfd, char *file);
+int merge(int sockfd, char *file);
 
 void help(char *progname)
 {
-    printf("Usage : %s -h -i [ip] -u [upload filename] -d [download filename] -l\n", progname);
+    printf("Usage : %s -h -i [ip] -u [upload filename] -d [download filename] -m [merge filenames] -l\n", progname);
 }
 
 int main(int argc, char * argv[]) {
@@ -45,7 +47,7 @@ int main(int argc, char * argv[]) {
     char fname[64]={0x00,};
     
     //process command line argument
-    while((opt = getopt(argc, argv, "hli:u:d:")) != -1) {
+    while((opt = getopt(argc, argv, "hli:u:d:m:")) != -1) {
         switch(opt) {
             case 'h':
                 help(argv[0]);
@@ -67,6 +69,12 @@ int main(int argc, char * argv[]) {
                 optflag = 1;
                 break;
                 
+            case 'm':
+                command_type = Q_MERGE;
+                sprintf(fname, "%s", optarg);
+                optflag = 1;
+                break;
+
             case 'l':
                 command_type = Q_LIST;
                 break;
@@ -110,13 +118,14 @@ int main(int argc, char * argv[]) {
             case (Q_LIST):
                 get_list(sockfd);
                 break;
-
+            case (Q_UPLOAD):
+                upload(sockfd, fname);
+                break;
             case (Q_DOWNLOAD):
                 download(sockfd, fname);
                 break;
-                
-            case (Q_UPLOAD):
-                upload(sockfd, fname);
+            case (Q_MERGE):
+                merge(sockfd, fname);
                 break;
                 
             default:
@@ -266,5 +275,50 @@ int download(int sockfd, char *file)
     close(sockfd);
 
     printf("End Download!\n");
+    return 1;
+}
+
+int merge(int sockfd, char *file) {
+    int readn;
+    char buf[MAXLINE];
+    int command=Q_MERGE;
+    int receive = 0;
+
+    printf("This is the Merge function\n");
+
+    //Send a command  (MERGE)
+    sprintf(buf, "%d", command);
+    if(send(sockfd, buf, MAXLINE, 0) == -1) {
+        return -1;
+    }
+    //Send a filename
+    sprintf(buf, "%s", file);
+    if(send(sockfd, buf, MAXLINE, 0) == -1) {
+        return -1;
+    }
+
+    //Open a file to write (MERGE)
+    FILE *f = fopen(file, "wb");
+
+    //Receive a merged file from a server
+    printf("Receiving file %s...\n", file);
+    memset(buf, 0, MAXLINE);
+    while((readn = recv(sockfd, buf, MAXLINE, 0)) > 0)
+    {
+        receive = 1;
+        if(fwrite(buf, readn, 1, f) < 1)
+            printf("ERROR: Failed to write file %s\n", file);
+        memset(buf, 0, MAXLINE);
+    }
+    fclose(f);
+
+    if(receive) {
+        printf("Receiving file %s is done!\n", file);
+    } else {
+        printf("ERROR: Failed to receive file %s\n", file);
+    }
+    close(sockfd);
+
+    printf("End Merge!\n");
     return 1;
 }

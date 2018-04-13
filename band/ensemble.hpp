@@ -11,4 +11,6 @@
 
 #include <stdio.h>
 
+int mergeVideo(std::string, std::string);
+
 #endif /* ensemble_hpp */
