@@ -14,7 +14,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <stdio.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <string.h>
 
 #define PORTNUM 3800
 #define MAXLINE 1024
@@ -132,24 +135,31 @@ int processRequest(int sockfd) {
 }
 
 int serv_file_list(int sockfd) {
-    char *ErrMsg;
-    int ret;
-    int sendn;
- 
     DIR *dirp;
     struct dirent *dentry;
     char buf[MAXLINE];
  
-    //    TODO:
-    //    Open a FTP directory
-    //    If there is no FTP directory named "ftpData", create one with 0755 permission
-    //    Then, read each entry in FTP directory and send the filename to a client
- 
+    //Read each entry in directory and send the filename to a client
+    if((dirp = opendir("video")) != NULL) {
+        memset(buf, 0, MAXLINE);
+        while((dentry = readdir(dirp)) != NULL) {
+            strncpy(buf, dentry->d_name, MAXLINE);
+            if(send(sockfd, buf, MAXLINE, 0) == -1)
+                printf("Send file list failed\n");
+            memset(buf, 0, MAXLINE);
+        }
+        closedir(dirp);
+    } else {
+        printf("Can't open directory\n");
+        closedir(dirp);
+    }
+    return 1;
 }
 
 int serv_file_upload(int sockfd, char *filename) {
     size_t readn;
     char buf[MAXLINE];
+    bool receive = false;
     
     //Tokenizing the filename
     char *token;
@@ -159,18 +169,26 @@ int serv_file_upload(int sockfd, char *filename) {
         strncpy(ret, token, 64);
 
     //Upload a file from a client
-    FILE *f = fopen(ret, "wb");
-    
+    char path[64] = {0x00,};
+    sprintf(path, "video/%s", ret);
+    FILE *f = fopen(path, "wb");
+
     printf("Receiving file %s...\n", ret);
     memset(buf, 0, MAXLINE);
     while((readn = recv(sockfd, buf, MAXLINE, 0)) > 0)
     {
+        receive = true;
         if(fwrite(buf, readn, 1, f) < 1)
             printf("ERROR: Failed to write file %s\n", filename);
         memset(buf, 0, MAXLINE);
     }
     fclose(f);
-    printf("Receiving file %s is done!\n", ret);
+
+    if(receive) {
+        printf("Receiving file %s is done!\n", ret);
+    } else {
+        printf("ERROR: Failed to receive file %s\n", ret);
+    }
     close(sockfd);
 
     return 1;
@@ -187,11 +205,14 @@ int serv_file_download(int sockfd, char *filename) {
         strncpy(ret, token, 64);
     
     //Open a file to read
-    FILE *f = fopen(ret, "rb");
+    char path[64] = {0x00,};
+    sprintf(path, "video/%s", ret);
+    FILE *f = fopen(path, "rb");
     if(f == NULL)
     {
         printf("ERROR: File %s not found.\n", ret);
         fclose(f);
+        close(sockfd);
         return -1;
     }
     
@@ -222,8 +243,13 @@ int serv_file_download(int sockfd, char *filename) {
             offset += sendn;
             bytestosend -= sendn;
         }
-    } else
+    } else {
+        fclose(f);
+        free(buffer);
         printf("ERROR: Failed to read file %s\n", ret);
+        close(sockfd);
+        return 0;
+    }
     
     fclose(f);
     free(buffer);

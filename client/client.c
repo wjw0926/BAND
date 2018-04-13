@@ -24,6 +24,7 @@
 #define Q_UPLOAD    2
 #define Q_DOWNLOAD  3
 
+int get_list(int sockfd);
 int upload(int sockfd, char *file);
 int download(int sockfd, char *file);
 
@@ -135,19 +136,22 @@ int get_list(int sockfd)
  
     printf("This is the list function\n");
  
-    //TODO: Send a command  (LIST)
+    //Send a command  (LIST)
     sprintf(buf, "%d", command);
     if(send(sockfd, buf, MAXLINE, 0) == -1) {
         return -1;
     }
-    //TODO: Send a filename
-    sprintf(buf, "%s", file);
+    //Send a filename
+    sprintf(buf, "%s", filename);
     if(send(sockfd, buf, MAXLINE, 0) == -1) {
         return -1;
     }
-    //TODO: Receive a directory entry from a server and printf it to the stdout
+    //Receive a file name from a server and printf it to the stdout
+    while(recv(sockfd, buf, MAXLINE, 0) > 0)
+        printf("%s\n", buf);
  
     printf("End List!\n");
+    return 1;
 }
 
 int upload(int sockfd, char *file)
@@ -173,6 +177,8 @@ int upload(int sockfd, char *file)
     if(f == NULL)
     {
         printf("ERROR: File %s not found.\n", file);
+        fclose(f);
+        close(sockfd);
         return -1;
     }
     //Send a file content to a server
@@ -202,8 +208,13 @@ int upload(int sockfd, char *file)
             offset += sendn;
             bytestosend -= sendn;
         }
-    } else
+    } else {
+        fclose(f);
+        free(buffer);
         printf("ERROR: Failed to read file %s\n", file);
+        close(sockfd);
+        return 0;
+    }
 
     fclose(f);
     free(buffer);
@@ -218,6 +229,7 @@ int download(int sockfd, char *file)
     int readn, writen;
     char buf[MAXLINE];
     int command=Q_DOWNLOAD;
+    int receive = 0;
  
     printf("This is the download function\n");
  
@@ -239,12 +251,18 @@ int download(int sockfd, char *file)
     memset(buf, 0, MAXLINE);
     while((readn = recv(sockfd, buf, MAXLINE, 0)) > 0)
     {
+        receive = 1;
         if(fwrite(buf, readn, 1, f) < 1)
             printf("ERROR: Failed to write file %s\n", file);
         memset(buf, 0, MAXLINE);
     }
     fclose(f);
-    printf("Receiving file %s is done!\n", file);
+
+    if(receive) {
+        printf("Receiving file %s is done!\n", file);
+    } else {
+        printf("ERROR: Failed to receive file %s\n", file);
+    }
     close(sockfd);
 
     printf("End Download!\n");
